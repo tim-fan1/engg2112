@@ -1,2 +1,4 @@
 .tim/
+.meigo/
 .DS_Store
+.venv/
