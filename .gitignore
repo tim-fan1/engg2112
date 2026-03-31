@@ -1,3 +1,5 @@
 .tim/
-.DS_Store
 tutorial/
+.meigo/
+.DS_Store
+.venv/
