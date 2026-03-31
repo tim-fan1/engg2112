@@ -1,0 +1,1 @@
+Fuel price prediction by postcode in Greater Sydney, using historical fuel prices, crude oil prices, AUD-USD exchange rates, Terminal Gate Price indices, local Sydney BOM weather. 
