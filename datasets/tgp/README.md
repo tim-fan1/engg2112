@@ -1,0 +1,2 @@
+TGP datasets were taken from https://www.aip.com.au/historical-ulp-and-diesel-tgp-data on 31.03.26
+1. Downloaded the AIP_Annual_TGP_Data spreadsheet (which gives a summary; the annual average, 1 row per year), and the AIP_TGP_Data_27-Mar-2026 spreadsheet (which gives more detail; the daily average, 365 rows per year)
