@@ -1,5 +1,4 @@
 # Check user is running this script from the 'engg2112' home directory.
-# python datasets/weather + fuel/merge.py
 import os
 current_folder = os.path.basename(os.getcwd())
 if current_folder != "engg2112":
