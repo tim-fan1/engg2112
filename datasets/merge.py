@@ -1,3 +1,10 @@
+"""
+meigo: when i merge them, i lose data of postcodes that dont fall under my regions
+from 100k rows to 79k i think.
+
+i make more regions to capture everything but what is there now is the gist of it
+"""
+
 # Check user is running this script from the 'engg2112' home directory.
 import os
 current_folder = os.path.basename(os.getcwd())
@@ -58,7 +65,7 @@ combined_df = pd.merge(
 # -----------------------------
 # 5. SAVE & PREVIEW
 # -----------------------------
-combined_df.to_csv("datasets/weather + fuel/fuel_weather_merged.csv", index=False)
+combined_df.to_csv("datasets/merged.csv", index=False)
 
 print(f"Successfully merged {len(combined_df)} rows.")
 print("\nQuick look at the combined data:")
