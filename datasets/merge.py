@@ -15,12 +15,18 @@ if current_folder != "engg2112":
 # User is in the right folder! Continue with script.
 import pandas as pd
 
+"""
+Hopefully this long script can merge everything--the datasets in exchange,
+fuel, oil, tgp, and weather--together into one spreadsheet datasets/merged.csv
+"""
+
 # -----------------------------
 # 1. LOAD DATA
 # -----------------------------
 # Adjust filenames if they are different on your computer
 fuel_df = pd.read_excel("datasets/fuel/6-month fuel datasets final.xlsx")
 weather_df = pd.read_csv("datasets/weather/weather_only_dataset.csv")
+tgp_df = pd.read_csv("datasets/tgp/petrol_tgp.csv")
 
 # -----------------------------
 # 2. DEFINE REGION MAPPING
@@ -49,18 +55,32 @@ fuel_df["Region"] = fuel_df["Postcode"].apply(assign_region)
 # We strip the time so they match.
 fuel_df["date"] = pd.to_datetime(fuel_df["PriceUpdatedDate"]).dt.normalize()
 weather_df["date"] = pd.to_datetime(weather_df["date"])
+tgp_df["date"] = pd.to_datetime(tgp_df["date"])
 
 # -----------------------------
 # 4. MERGE
 # -----------------------------
 # We merge on BOTH 'date' and 'Region'
 # Use 'inner' to keep only records where we have matches in both
+
+# Merging (Fuel) + Weather
 combined_df = pd.merge(
     fuel_df, 
     weather_df, 
     on=["date", "Region"], 
     how="inner"
 )
+
+# Merging (Fuel + Weather) + TGP
+combined_df = pd.merge(
+    combined_df, 
+    tgp_df, 
+    on="date", 
+    how="inner"
+)
+
+# TODO: Merging (Fuel + Weather + TGP) + Oil
+# TODO: Merging (Fuel + Weather + TGP + Oil) + Exchange
 
 # -----------------------------
 # 5. SAVE & PREVIEW
@@ -69,4 +89,4 @@ combined_df.to_csv("datasets/merged.csv", index=False)
 
 print(f"Successfully merged {len(combined_df)} rows.")
 print("\nQuick look at the combined data:")
-print(combined_df[['date', 'Region', 'Price', 'temp_max', 'rainfall']].head())
+print(combined_df[['date', 'Region', 'Price', 'temp_max', 'rainfall', 'sydney_tgp']].head(500))

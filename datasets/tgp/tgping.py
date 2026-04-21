@@ -17,7 +17,19 @@ try:
     # 2. Read the specific sheet into a DataFrame
     df = pd.read_excel(excel_file, sheet_name=sheet_to_extract)
 
-    # 3. Export the DataFrame to a CSV file
+    # 3. Assuming Column 0 is Date and Column 1 is Sydney.
+    # We use .copy() to avoid "SettingWithCopy" warnings later.
+    df = df.iloc[:, [0, 1]].copy()
+
+    # 4. Clean up the data
+    # Rename columns to standard names
+    df.columns = ['date', 'sydney_tgp']
+
+    # Drop any rows that are empty or contain header text instead of dates
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+    df = df.dropna(subset=['date'])
+
+    # 5. Export the DataFrame to a CSV file
     # index=False prevents pandas from adding an extra column for row numbers
     df.to_csv(output_csv, index=False)
     
