@@ -50,7 +50,7 @@ combined_df = pd.merge(
 # -----------------------------
 # 5. SAVE & PREVIEW
 # -----------------------------
-combined_df.to_csv("fuel_weather_merged.csv", index=False)
+combined_df.to_csv("engg2112/datasets/weather + fuel/fuel_weather_merged.csv", index=False)
 
 print(f"Successfully merged {len(combined_df)} rows.")
 print("\nQuick look at the combined data:")
