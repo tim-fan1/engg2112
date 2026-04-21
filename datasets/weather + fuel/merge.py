@@ -1,11 +1,20 @@
+# Check user is running this script from the 'engg2112' home directory.
+# python datasets/weather + fuel/merge.py
+import os
+current_folder = os.path.basename(os.getcwd())
+if current_folder != "engg2112":
+    print("Error: Please run this script from the 'engg2112' home directory.")
+    exit()  # Stops the script immediately
+
+# User is in the right folder! Continue with script.
 import pandas as pd
 
 # -----------------------------
 # 1. LOAD DATA
 # -----------------------------
 # Adjust filenames if they are different on your computer
-fuel_df = pd.read_excel("engg2112/datasets/fuel/6-month fuel datasets final.xlsx")
-weather_df = pd.read_csv("engg2112/datasets/weather/weather_only_dataset.csv")
+fuel_df = pd.read_excel("datasets/fuel/6-month fuel datasets final.xlsx")
+weather_df = pd.read_csv("datasets/weather/weather_only_dataset.csv")
 
 # -----------------------------
 # 2. DEFINE REGION MAPPING
@@ -50,7 +59,7 @@ combined_df = pd.merge(
 # -----------------------------
 # 5. SAVE & PREVIEW
 # -----------------------------
-combined_df.to_csv("engg2112/datasets/weather + fuel/fuel_weather_merged.csv", index=False)
+combined_df.to_csv("datasets/weather + fuel/fuel_weather_merged.csv", index=False)
 
 print(f"Successfully merged {len(combined_df)} rows.")
 print("\nQuick look at the combined data:")

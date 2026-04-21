@@ -1,9 +1,18 @@
+# Check user is running this script from the 'engg2112' home directory.
+# python datasets/weather + fuel/merge.py
+import os
+current_folder = os.path.basename(os.getcwd())
+if current_folder != "engg2112":
+    print("Error: Please run this script from the 'engg2112' home directory.")
+    exit()  # Stops the script immediately
+
+# User is in the right folder! Continue with script.
 import pandas as pd
 
 # 1. Define your file paths and the sheet name
-excel_file = 'engg2112/datasets/tgp/AIP_TGP_Data_27-Mar-2026.xlsx'
+excel_file = 'datasets/tgp/AIP_TGP_Data_27-Mar-2026.xlsx'
 sheet_to_extract = 'Petrol TGP'  # Can also use the integer index (e.g., 0)
-output_csv = 'engg2112/datasets/tgp/petrol_tgp.csv'
+output_csv = 'datasets/tgp/petrol_tgp.csv'
 
 try:
     # 2. Read the specific sheet into a DataFrame
