@@ -1,3 +1,11 @@
+# Check user is running this script from the 'engg2112' home directory.
+import os
+current_folder = os.path.basename(os.getcwd())
+if current_folder != "engg2112":
+    print("Error: Please run this script from the 'engg2112' home directory.")
+    exit()  # Stops the script immediately
+
+# User is in the right folder! Continue with script.
 import pandas as pd
 import requests
 from io import StringIO
@@ -143,6 +151,6 @@ print(weather_df.head())
 # 6. SAVE OUTPUT
 # -----------------------------
 
-weather_df.to_csv("engg2112/datasets/weather/weather_only_dataset.csv", index=False)
+weather_df.to_csv("datasets/weather/weather_only_dataset.csv", index=False)
 
 print("\nSaved: weather_only_dataset.csv")
