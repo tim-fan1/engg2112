@@ -99,11 +99,7 @@ combined_df = pd.merge(
 # -----------------------------
 # 5. SAVE & PREVIEW
 # -----------------------------
-<<<<<<<< HEAD:datasets/merging/others/fuel+weather.py
 combined_df.to_csv("engg2112/datasets/merging/fuel_weather_merged.csv", index=False)
-========
-combined_df.to_csv("datasets/merged.csv", index=False)
->>>>>>>> 43b3bfe46af6e8881188591edcf680b2afb59f59:datasets/merge.py
 
 print(f"Successfully merged {len(combined_df)} rows.")
 print("\nQuick look at the combined data:")
