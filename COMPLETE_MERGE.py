@@ -10,7 +10,7 @@ WEATHER_FILE = "engg2112/datasets/weather/weather_only_dataset.csv"
 OIL_FILE = "engg2112/datasets/oil/daily oil price.xlsx"
 TGP_FILE = "engg2112/datasets/tgp/petrol_tgp.csv"
 FX_FILE = "engg2112/datasets/exchange/2023-current.xls"
-OUTPUT_FILE = "COMPLETE_DATASET.csv"
+OUTPUT_FILE = "engg2112/COMPLETE_DATASET.csv"
 
 def assign_region(postcode):
     """Maps postcodes to your 6 specific weather regions"""
