@@ -8,9 +8,9 @@ if current_folder != "engg2112":
     exit()  # Stops the script immediately
 
 """
-Task 1. Merge individual datasets, save to COMPLETE_DATASET.csv
+Task 1. Merge individual datasets, save to datasets/COMPLETE_DATASET.csv
 Task 2. Generate features columns, like time lag or rolling averages
-Task 3. Remove unnecessary columns, save to MODEL_READY_DATASET.csv
+Task 3. Remove unnecessary columns, save to datasets/MODEL_READY_DATASET.csv
 """
 
 # ------------------------------------------------------------------------------
@@ -30,7 +30,8 @@ WEATHER_FILE = "datasets/weather/weather_only_dataset.csv"
 OIL_FILE = "datasets/oil/daily oil price.xlsx"
 TGP_FILE = "datasets/tgp/petrol_tgp.csv"
 FX_FILE = "datasets/exchange/2023-current.xls"
-OUTPUT_FILE = "COMPLETE_DATASET.csv"
+COMPLETE_OUTPUT_FILE = "datasets/COMPLETE_DATASET.csv"
+MODEL_READY_OUTPUT_FILE = "datasets/MODEL_READY_DATASET.csv"
 
 def assign_region(postcode):
     """Maps postcodes to your 6 specific weather regions"""
@@ -144,16 +145,16 @@ df_final[cols_to_fill] = df_final[cols_to_fill].ffill().bfill()
 # g. save to COMPLETE DATASET.csv
 # -----------------------------
 # Get the folder path
-output_dir = os.path.dirname(OUTPUT_FILE)
+output_dir = os.path.dirname(COMPLETE_OUTPUT_FILE)
 
 # Only try to create the folder if a folder path actually exists
 if output_dir:
     os.makedirs(output_dir, exist_ok=True)
 
-df_final.to_csv(OUTPUT_FILE, index=False)
+df_final.to_csv(COMPLETE_OUTPUT_FILE, index=False)
 
 print("-" * 80)
-print(f"SUCCESS: {OUTPUT_FILE} is ready.")
+print(f"SUCCESS: {COMPLETE_OUTPUT_FILE} is ready.")
 print("-" * 80)
 
 df_final.info()
@@ -270,9 +271,9 @@ cols_to_drop = [
 ]
 df_final = df_final.sort_values('date')
 df_final = df_final.drop(columns=cols_to_drop)
-df_final.to_csv('MODEL_READY_DATASET.csv', index=False)
+df_final.to_csv(MODEL_READY_OUTPUT_FILE, index=False)
 
 print("-" * 80)
-print(f"SUCCESS: MODEL_READY_DATASET.csv is ready.")
+print(f"SUCCESS: ${MODEL_READY_OUTPUT_FILE} is ready.")
 print("-" * 80)
 df_final.info()
