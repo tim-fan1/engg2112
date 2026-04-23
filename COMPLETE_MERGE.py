@@ -1,8 +1,24 @@
 import pandas as pd
 import os
 
+# Check user is running this script from the 'engg2112' home directory.
+# current_folder = os.path.basename(os.getcwd())
+# if current_folder != "engg2112":
+#     print("Error: Please run this script from the 'engg2112' home directory.")
+#     exit()  # Stops the script immediately
+
+"""
+Task 1. Merge individual datasets, save to COMPLETE_DATASET.csv
+Task 2. Generate features columns, like time lag or rolling averages
+Task 3. Remove unnecessary columns, save to MODEL_READY_DATASET.csv
+"""
+
+# ------------------------------------------------------------------------------
+#      Task 1. Merge individual datasets, save to COMPLETE_DATASET.csv
+# ------------------------------------------------------------------------------
+
 # -----------------------------
-# 1. SETUP & FILE PATHS
+# a. SETUP & FILE PATHS
 # -----------------------------
 # Adjust these names if your files are named differently
 FUEL_FILE = "engg2112/datasets/fuel/6-month fuel datasets final.xlsx"
@@ -27,7 +43,7 @@ def assign_region(postcode):
         return "Regional"
 
 # -----------------------------
-# 2. LOAD & CLEAN DATASETS
+# b. LOAD & CLEAN DATASETS
 # -----------------------------
 print("Step 1: Loading all datasets...")
 fuel_df = pd.read_excel(FUEL_FILE)
@@ -40,7 +56,7 @@ fx_df_raw = pd.read_excel(FX_FILE, skiprows=1, nrows=0) # Get headers
 fx_data = pd.read_excel(FX_FILE, skiprows=11, names=fx_df_raw.columns) # Get data
 
 # -----------------------------
-# 3. STANDARDIZE DATES & NAMES
+# c. STANDARDIZE DATES & NAMES
 # -----------------------------
 print("Step 2: Standardizing dates...")
 
@@ -63,7 +79,7 @@ tgp_df['date'] = pd.to_datetime(tgp_df[tgp_date_col])
 tgp_df = tgp_df[['date', 'sydney_tgp']].rename(columns={'sydney_tgp': 'tgp_sydney'})
 
 # -----------------------------
-# Convert FX Date (ROBUST VERSION)
+# d. Convert FX Date
 # -----------------------------
 
 # 1. Identify likely date column (usually first column)
@@ -100,7 +116,7 @@ print(fx_data.head())
 print("FX date range:", fx_data['date'].min(), "to", fx_data['date'].max())
 
 # -----------------------------
-# 4. MULTI-STEP MERGE
+# e. MULTI-STEP MERGE
 # -----------------------------
 print("Step 3: Merging all data layers...")
 
@@ -116,7 +132,7 @@ df_final = pd.merge(df_final, tgp_df, on='date', how='left')
 df_final = pd.merge(df_final, fx_data, on='date', how='left')
 
 # -----------------------------
-# 5. HANDLE WEEKENDS (Forward Fill)
+# f. HANDLE WEEKENDS (Forward Fill)
 # -----------------------------
 print("Step 4: Filling weekend gaps for market data...")
 # Market data (Oil, TGP, FX) is missing on weekends. 
@@ -126,7 +142,7 @@ cols_to_fill = ['oil_price', 'tgp_sydney', 'aud_usd']
 df_final[cols_to_fill] = df_final[cols_to_fill].ffill().bfill()
 
 # -----------------------------
-# 6. SAVE
+# g. save to COMPLETE DATASET.csv
 # -----------------------------
 # Get the folder path
 output_dir = os.path.dirname(OUTPUT_FILE)
@@ -142,3 +158,103 @@ print(f"SUCCESS: {OUTPUT_FILE} is ready.")
 print(f"Total Rows: {len(df_final)}")
 print(f"Variables: Price, Temp, Rain, Oil, TGP, FX (AUD/USD)")
 print("-" * 30)
+
+# ------------------------------------------------------------------------------
+#                    Task 2. Generate features columns
+# ------------------------------------------------------------------------------
+
+# Make all columns lowercase
+df_final.columns = [col.lower() for col in df_final.columns]
+
+# ------------------------------------------------------------------------
+# a. Averages Features: postcode_daily_average and postcode_rolling_7d
+# ------------------------------------------------------------------------
+
+# For each (postcode, date) pair, what is the average of all prices; rows that have (postcode, date)
+daily_avg_df = df_final.groupby(['postcode', 'date'])['price'].mean().reset_index()
+
+# This is a new df isn't it; daily_avg_df. Rename the price column within this to postcode_daily_avg
+daily_avg_df.rename(columns={'price': 'postcode_daily_avg'}, inplace=True)
+
+# Sort to ensure the timeline is chronological for the rolling calculation
+daily_avg_df = daily_avg_df.sort_values(['postcode', 'date'])
+
+# Make new column that is 7-day rolling average
+# Note: What to do about the first 7 days of dataset? 
+# This implements a simple solution, just do the best that can do, e.g.:
+# - 1st day's average is just 1st day 
+# - 2nd day's average is average of 1st and 2nd day
+# - 3rd day's average is average of 1st, 2nd, and 3rd day
+# - ...
+# Alternatively, could also download the previous month's dataset,
+# but I think that's a hassle; let's assume we only have access to 
+# the datasets that are in the project repository.
+daily_avg_df['postcode_rolling_7d'] = daily_avg_df.groupby('postcode')['postcode_daily_avg'].transform(
+    lambda x: x.rolling(window=7, min_periods=1).mean()
+)
+
+# Merge new daily_avg_df with old df_final
+df_final = df_final.merge(daily_avg_df, on=['postcode', 'date'], how='left')
+
+# --------------------------------------------------------------------------
+# b. Time Lag Features: [oil|tgp|exchange]_price_lag, etc., daily and weekly
+# --------------------------------------------------------------------------
+
+# Making sure there is just one oil_price, tgp_sydney, and aud_usd for each date
+lag_df = df_final.groupby('date')[['oil_price', 'tgp_sydney', 'aud_usd']].mean().reset_index()
+
+# And sort by date so that can then calculate the time lag features
+lag_df = lag_df.sort_values('date')
+lag_df['oil_price_lag_1'] = lag_df['oil_price'].shift(1) # Yesterday
+lag_df['oil_price_lag_7'] = lag_df['oil_price'].shift(7) # Last week
+lag_df['tgp_sydney_lag_1'] = lag_df['tgp_sydney'].shift(1)
+lag_df['tgp_sydney_lag_7'] = lag_df['tgp_sydney'].shift(7)
+lag_df['aud_usd_lag_1'] = lag_df['aud_usd'].shift(1)
+lag_df['aud_usd_lag_7'] = lag_df['aud_usd'].shift(7)
+
+# Use fillna to fill in missing values (the first day and first week due to lag)
+cols_to_fix = [
+    'oil_price_lag_1', 'oil_price_lag_7', 
+    'tgp_sydney_lag_1', 'tgp_sydney_lag_7', 
+    'aud_usd_lag_1', 'aud_usd_lag_7'
+]
+lag_df[cols_to_fix] = lag_df[cols_to_fix].fillna(method='bfill')
+
+# Take the subset ['date' + cols_to_fix] of lag_df, and merge with original
+df_final = df_final.merge(lag_df[['date'] + cols_to_fix], on='date', how='left')
+
+# ---------------------------------------
+# c. Day of Week Feature: day_of_week
+# ---------------------------------------
+
+# Save as a number from 0 to 6 inclusive
+df_final['day_of_week'] = df_final['date'].dt.dayofweek
+
+# --------------------------------------------
+# e. TARGET FEATURE: target_next_day_price
+# --------------------------------------------
+
+df_final = df_final.sort_values(['servicestationname', 'date'])
+df_final['target_next_day_price'] = df_final.groupby('servicestationname')['price'].shift(-1)
+
+# Remove rows with missing target; should just be the last one day
+df_final = df_final.dropna(subset=['target_next_day_price'])
+
+# ------------------------------------------------------------------------------
+#      Task 3. Remove unnecessary columns, save to MODEL_READY_DATASET.csv
+# ------------------------------------------------------------------------------
+
+cols_to_drop = [
+    'servicestationname', 
+    'address', 
+    'suburb', 
+    'region', 
+    'date',
+    'brand',
+    'fuelcode'
+]
+df_final = df_final.sort_values('date')
+df_final = df_final.drop(columns=cols_to_drop)
+df_final.to_csv('engg2112/MODEL_READY_DATASET.csv', index=False)
+
+df_final.info()
