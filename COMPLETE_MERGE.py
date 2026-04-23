@@ -2,10 +2,10 @@ import pandas as pd
 import os
 
 # Check user is running this script from the 'engg2112' home directory.
-# current_folder = os.path.basename(os.getcwd())
-# if current_folder != "engg2112":
-#     print("Error: Please run this script from the 'engg2112' home directory.")
-#     exit()  # Stops the script immediately
+current_folder = os.path.basename(os.getcwd())
+if current_folder != "engg2112":
+    print("Error: Please run this script from the 'engg2112' home directory.")
+    exit()  # Stops the script immediately
 
 """
 Task 1. Merge individual datasets, save to COMPLETE_DATASET.csv
@@ -21,12 +21,12 @@ Task 3. Remove unnecessary columns, save to MODEL_READY_DATASET.csv
 # a. SETUP & FILE PATHS
 # -----------------------------
 # Adjust these names if your files are named differently
-FUEL_FILE = "engg2112/datasets/fuel/6-month fuel datasets final.xlsx"
-WEATHER_FILE = "engg2112/datasets/weather/weather_only_dataset.csv"
-OIL_FILE = "engg2112/datasets/oil/daily oil price.xlsx"
-TGP_FILE = "engg2112/datasets/tgp/petrol_tgp.csv"
-FX_FILE = "engg2112/datasets/exchange/2023-current.xls"
-OUTPUT_FILE = "engg2112/COMPLETE_DATASET.csv"
+FUEL_FILE = "datasets/fuel/6-month fuel datasets final.xlsx"
+WEATHER_FILE = "datasets/weather/weather_only_dataset.csv"
+OIL_FILE = "datasets/oil/daily oil price.xlsx"
+TGP_FILE = "datasets/tgp/petrol_tgp.csv"
+FX_FILE = "datasets/exchange/2023-current.xls"
+OUTPUT_FILE = "COMPLETE_DATASET.csv"
 
 def assign_region(postcode):
     """Maps postcodes to your 6 specific weather regions"""
@@ -255,6 +255,6 @@ cols_to_drop = [
 ]
 df_final = df_final.sort_values('date')
 df_final = df_final.drop(columns=cols_to_drop)
-df_final.to_csv('engg2112/MODEL_READY_DATASET.csv', index=False)
+df_final.to_csv('MODEL_READY_DATASET.csv', index=False)
 
 df_final.info()
