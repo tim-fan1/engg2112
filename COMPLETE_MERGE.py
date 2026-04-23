@@ -17,6 +17,10 @@ Task 3. Remove unnecessary columns, save to MODEL_READY_DATASET.csv
 #      Task 1. Merge individual datasets, save to COMPLETE_DATASET.csv
 # ------------------------------------------------------------------------------
 
+print("-" * 80)
+print(f"Beginning Merging Individual Datasets, Complete Dataset...")
+print("-" * 80)
+
 # -----------------------------
 # a. SETUP & FILE PATHS
 # -----------------------------
@@ -110,11 +114,6 @@ fx_data = fx_data[['date', fx_col]].rename(columns={fx_col: 'aud_usd'})
 # 7. Normalize date (remove time component)
 fx_data['date'] = fx_data['date'].dt.normalize()
 
-# Debug check (optional but recommended)
-print("FX data preview:")
-print(fx_data.head())
-print("FX date range:", fx_data['date'].min(), "to", fx_data['date'].max())
-
 # -----------------------------
 # e. MULTI-STEP MERGE
 # -----------------------------
@@ -153,11 +152,15 @@ if output_dir:
 
 df_final.to_csv(OUTPUT_FILE, index=False)
 
-print("-" * 30)
+print("-" * 80)
 print(f"SUCCESS: {OUTPUT_FILE} is ready.")
-print(f"Total Rows: {len(df_final)}")
-print(f"Variables: Price, Temp, Rain, Oil, TGP, FX (AUD/USD)")
-print("-" * 30)
+print("-" * 80)
+
+df_final.info()
+
+print("-" * 80)
+print(f"Beginning Features Generation, Model-Ready Dataset...")
+print("-" * 80)
 
 # ------------------------------------------------------------------------------
 #                    Task 2. Generate features columns
@@ -170,6 +173,7 @@ df_final.columns = [col.lower() for col in df_final.columns]
 # a. Averages Features: postcode_daily_average and postcode_rolling_7d
 # ------------------------------------------------------------------------
 
+print("Step 1: Daily and Weekly Average Features...")
 # For each (postcode, date) pair, what is the average of all prices; rows that have (postcode, date)
 daily_avg_df = df_final.groupby(['postcode', 'date'])['price'].mean().reset_index()
 
@@ -200,6 +204,7 @@ df_final = df_final.merge(daily_avg_df, on=['postcode', 'date'], how='left')
 # b. Time Lag Features: [oil|tgp|exchange]_price_lag, etc., daily and weekly
 # --------------------------------------------------------------------------
 
+print("Step 2: Daily and Weekly Time Lag Features...")
 # Making sure there is just one oil_price, tgp_sydney, and aud_usd for each date
 lag_df = df_final.groupby('date')[['oil_price', 'tgp_sydney', 'aud_usd']].mean().reset_index()
 
@@ -218,7 +223,7 @@ cols_to_fix = [
     'tgp_sydney_lag_1', 'tgp_sydney_lag_7', 
     'aud_usd_lag_1', 'aud_usd_lag_7'
 ]
-lag_df[cols_to_fix] = lag_df[cols_to_fix].fillna(method='bfill')
+lag_df[cols_to_fix] = lag_df[cols_to_fix].bfill()
 
 # Take the subset ['date' + cols_to_fix] of lag_df, and merge with original
 df_final = df_final.merge(lag_df[['date'] + cols_to_fix], on='date', how='left')
@@ -227,6 +232,7 @@ df_final = df_final.merge(lag_df[['date'] + cols_to_fix], on='date', how='left')
 # c. Day of Week Feature: day_of_week
 # ---------------------------------------
 
+print("Step 3: Day-of-Week Feature...")
 # Save as a number from 0 to 6 inclusive
 df_final['day_of_week'] = df_final['date'].dt.dayofweek
 
@@ -234,16 +240,25 @@ df_final['day_of_week'] = df_final['date'].dt.dayofweek
 # e. TARGET FEATURE: target_next_day_price
 # --------------------------------------------
 
+print("Step 4: Building Target Feature...")
+# The problem with this is that it assumes service stations report E10 every day
 df_final = df_final.sort_values(['servicestationname', 'date'])
 df_final['target_next_day_price'] = df_final.groupby('servicestationname')['price'].shift(-1)
 
-# Remove rows with missing target; should just be the last one day
-df_final = df_final.dropna(subset=['target_next_day_price'])
+print("Step 5: Include only daily consecutive rows...")
+# The solution? Only include consecutive rows where the days apart is exactly 1
+# Note: This cuts A LOT of rows. 
+df_final['target_date'] = df_final.groupby('servicestationname')['date'].shift(-1)
+df_final['days_to_target'] = (df_final['target_date'] - df_final['date']).dt.days
+df_final = df_final[df_final['days_to_target'] == 1]
+
+# Drop the temp columns
+df_final = df_final.drop(columns=['target_date', 'days_to_target'])
 
 # ------------------------------------------------------------------------------
 #      Task 3. Remove unnecessary columns, save to MODEL_READY_DATASET.csv
 # ------------------------------------------------------------------------------
-
+print("Step 6: Remove non-number non-boolean columns...")
 cols_to_drop = [
     'servicestationname', 
     'address', 
@@ -257,4 +272,7 @@ df_final = df_final.sort_values('date')
 df_final = df_final.drop(columns=cols_to_drop)
 df_final.to_csv('MODEL_READY_DATASET.csv', index=False)
 
+print("-" * 80)
+print(f"SUCCESS: MODEL_READY_DATASET.csv is ready.")
+print("-" * 80)
 df_final.info()
