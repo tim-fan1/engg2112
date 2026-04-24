@@ -38,7 +38,7 @@ def download_and_filter_nsw_fuel():
                 df = pd.read_excel(file_content)
             else:
                 # Some CSVs use latin-1 encoding
-                df = pd.read_csv(file_content, encoding='cp1252')
+                df = pd.read_csv(file_content, encoding='utf-8-sig')
             
             # Filter for E10
             e10_df = df[df['FuelCode'] == 'E10'].copy()
@@ -50,7 +50,7 @@ def download_and_filter_nsw_fuel():
 
     if master_list:
         final_csv = pd.concat(master_list, ignore_index=True)
-        final_csv.to_csv("engg2112/datasets/fuel/NSW_E10_Full_Year_25_26.csv", index=False)
+        final_csv.to_csv("datasets/fuel/NSW_E10_Full_Year_25_26.csv", index=False)
         print("\n--- Done! File saved as 'NSW_E10_Full_Year_25_26.csv' ---")
 
 if __name__ == "__main__":

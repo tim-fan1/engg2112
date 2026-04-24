@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 
-df = pd.read_csv('engg2112/COMPLETE_DATASET.csv')
+df = pd.read_csv('datasets/YEAR_COMPLETE_DATASET.csv')
 df['date'] = pd.to_datetime(df['date'])
 
 # Generate full date range and count occurrences
@@ -15,4 +15,4 @@ plt.title('Evidence: Daily Record Counts (Gaps indicate missing data)')
 plt.xlabel('Date')
 plt.ylabel('Number of Price Updates')
 plt.grid(True, alpha=0.3)
-plt.savefig('engg2112/feature checks/continuity_check.png')
+plt.savefig('feature checks/continuity_check.png')
