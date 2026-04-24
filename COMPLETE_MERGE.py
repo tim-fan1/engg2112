@@ -5,12 +5,12 @@ import os
 # 1. SETUP & FILE PATHS
 # -----------------------------
 # Adjust these names if your files are named differently
-FUEL_FILE = "engg2112/datasets/fuel/6-month fuel datasets final.xlsx"
-WEATHER_FILE = "engg2112/datasets/weather/weather_only_dataset.csv"
-OIL_FILE = "engg2112/datasets/oil/daily oil price.xlsx"
-TGP_FILE = "engg2112/datasets/tgp/petrol_tgp.csv"
-FX_FILE = "engg2112/datasets/exchange/2023-current.xls"
-OUTPUT_FILE = "engg2112/COMPLETE_DATASET.csv"
+FUEL_FILE = "datasets/fuel/6-month fuel datasets final.xlsx"
+WEATHER_FILE = "datasets/weather/weather_only_dataset.csv"
+OIL_FILE = "datasets/oil/daily oil price.xlsx"
+TGP_FILE = "datasets/tgp/petrol_tgp.csv"
+FX_FILE = "datasets/exchange/2023-current.xls"
+OUTPUT_FILE = "COMPLETE_DATASET.csv"
 
 def assign_region(postcode):
     """Maps postcodes to your 6 specific weather regions"""
