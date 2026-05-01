@@ -3,3 +3,6 @@ tutorial/
 .meigo/
 .DS_Store
 .venv/
+COMPLETE_DATASET.csv
+MODEL_READY_DATASET.csv
+YEAR_COMPLETE_DATASET.csv

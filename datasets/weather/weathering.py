@@ -1,3 +1,11 @@
+# Check user is running this script from the 'engg2112' home directory.
+import os
+current_folder = os.path.basename(os.getcwd())
+if current_folder != "engg2112":
+    print("Error: Please run this script from the 'engg2112' home directory.")
+    exit()  # Stops the script immediately
+
+# User is in the right folder! Continue with script.
 import pandas as pd
 import requests
 from io import StringIO
@@ -10,7 +18,9 @@ station_to_region = {
     "IDCJDW2124": "Sydney_CBD",
     "IDCJDW2126": "Western_Sydney",
     "IDCJDW2133": "South_West_Sydney",
-    "IDCJDW2111": "Hunter"
+    "IDCJDW2111": "Hunter",
+    "IDCJDW2144": "Wollongong",    # Added: Wollongong (Albion Park)
+    "IDCJDW2801": "Canberra"       # Added: Canberra Airport
 }
 
 months = ["202509", "202510", "202511", "202512", "202601", "202602"]
@@ -70,7 +80,10 @@ def download_station_data(station_id):
         url = f"http://www.bom.gov.au/climate/dwo/{m}/text/{station_id}.{m}.csv"
         df = fetch_csv(url, station_id)
         if df is None:
+            print("❌ Failed")
             continue
+
+        print("✅ Success") 
 
         df.columns = df.columns.str.strip()
         df = df.rename(columns={
@@ -138,6 +151,6 @@ print(weather_df.head())
 # 6. SAVE OUTPUT
 # -----------------------------
 
-weather_df.to_csv("engg2112/datasets/weather/weather_only_dataset.csv", index=False)
+weather_df.to_csv("datasets/weather/weather_only_dataset.csv", index=False)
 
 print("\nSaved: weather_only_dataset.csv")
