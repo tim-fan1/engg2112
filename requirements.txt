@@ -35,6 +35,7 @@ gast==0.7.0
 gitdb==4.0.12
 GitPython==3.1.46
 google-pasta==0.2.0
+graphviz==0.21
 grpcio==1.78.0
 h11==0.16.0
 h5py==3.15.1
@@ -101,6 +102,7 @@ packaging==26.0
 pandas==2.3.3
 pandocfilters==1.5.1
 parso==0.8.6
+patsy==1.0.2
 pexpect==4.9.0
 pillow==12.1.1
 platformdirs==4.9.4
@@ -141,6 +143,7 @@ slicer==0.0.8
 smmap==5.0.2
 soupsieve==2.8.3
 stack-data==0.6.3
+statsmodels==0.14.6
 streamlit==1.55.0
 tenacity==9.1.4
 tensorboard==2.20.0
@@ -168,3 +171,4 @@ wheel==0.46.3
 widgetsnbextension==4.0.15
 wrapt==2.1.2
 xgboost==3.2.0
+xlrd==2.0.2
