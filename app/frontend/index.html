@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Location Search</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --border-color: #cbd5e1;
+            --text-color: #1e293b;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f8fafc;
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .search-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            padding: 20px;
+        }
+
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 14px 16px;
+            font-size: 16px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary-color);
+        }
+
+        /* The Autocomplete Dropdown Box */
+        .suggestions-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background-color: #ffffff;
+            border: 1px solid var(--border-color);
+            border-top: none;
+            border-radius: 0 0 8px 8px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            max-height: 250px;
+            overflow-y: auto;
+            z-index: 10;
+            display: none; /* Hidden by default */
+            margin-top: 4px;
+        }
+
+        .suggestion-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            border-bottom: 1px solid #f1f5f9;
+            transition: background-color 0.15s;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestion-item:hover {
+            background-color: #f1f5f9;
+        }
+
+        /* Info Result Card */
+        .result-card {
+            margin-top: 20px;
+            padding: 16px;
+            background-color: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="search-container">
+        <h2>Where to?</h2>
+        <div class="input-wrapper">
+            <input 
+                type="text" 
+                id="address-search" 
+                class="search-input" 
+                placeholder="Type an address..." 
+                autocomplete="off"
+            >
+            <div id="suggestions" class="suggestions-dropdown"></div>
+        </div>
+
+        <div id="result" class="result-card">
+            <h4 style="margin: 0 0 8px 0; color: var(--primary-color);">Selected Location Data</h4>
+            <p id="selected-address" style="margin: 0 0 8px 0; font-size: 14px; font-weight: 500;"></p>
+            <small id="selected-coords" style="color: #64748b;"></small>
+        </div>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('address-search');
+        const suggestionsBox = document.getElementById('suggestions');
+        const resultCard = document.getElementById('result');
+        const selectedAddressText = document.getElementById('selected-address');
+        const selectedCoordsText = document.getElementById('selected-coords');
+
+        let debounceTimer;
+
+        // 1. Listen for typing events
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+
+            // Clear the timer on every keystroke
+            clearTimeout(debounceTimer);
+
+            if (query.length < 3) {
+                hideDropdown();
+                return;
+            }
+
+            // "Debounce" the API call: Wait 300ms after user stops typing to trigger fetch
+            debounceTimer = setTimeout(() => {
+                fetchAddresses(query);
+            }, 300);
+        });
+
+        // 2. Fetch data from OpenStreetMap Nominatim API
+        async function fetchAddresses(query) {
+            // format=json returns easily readable data
+            // addressdetails=1 breaks down city/country details
+            // limit=5 keeps the UI clean
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&addressdetails=1&limit=5`;
+
+            try {
+                const response = await fetch(url, {
+                    headers: {
+                        'Accept-Language': 'en' // Forces results to try and be in English
+                    }
+                });
+                const data = await response.json();
+                
+                displaySuggestions(data);
+            } catch (error) {
+                console.error("Error fetching address details:", error);
+            }
+        }
+
+        // 3. Render suggestions into the dropdown
+        function displaySuggestions(locations) {
+            suggestionsBox.innerHTML = '';
+
+            if (locations.length === 0) {
+                hideDropdown();
+                return;
+            }
+
+            locations.forEach(location => {
+                const item = document.createElement('div');
+                item.className = 'suggestion-item';
+                item.textContent = location.display_name;
+                
+                // Store spatial details on the element
+                item.dataset.lat = location.lat;
+                item.dataset.lon = location.lon;
+                item.dataset.fullName = location.display_name;
+
+                // Handle click on a suggestion
+                item.addEventListener('click', () => {
+                    selectLocation(item.dataset.fullName, item.dataset.lat, item.dataset.lon);
+                });
+
+                suggestionsBox.appendChild(item);
+            });
+
+            suggestionsBox.style.display = 'block';
+        }
+
+        // 4. Handle selecting a match
+        function selectLocation(name, lat, lon) {
+            searchInput.value = name;
+            hideDropdown();
+
+            // Show user the coordinate payload
+            selectedAddressText.textContent = name;
+            selectedCoordsText.textContent = `Latitude: ${lat} | Longitude: ${lon}`;
+            resultCard.style.display = 'block';
+        }
+
+        function hideDropdown() {
+            suggestionsBox.style.display = 'none';
+        }
+
+        // Hide dropdown if user clicks outside of the search box
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
+                hideDropdown();
+            }
+        });
+    </script>
+</body>
+</html>
