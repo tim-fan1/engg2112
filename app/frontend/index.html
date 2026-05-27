@@ -506,7 +506,7 @@
                     cell.title = "Click for 14-day forecast chart";
                     cell.dataset.suburb = itemSuburbName.toUpperCase();
                     cell.dataset.postcode = itemPostcode;
-                    cell.addEventListener('click', () => {
+                    // cell.addEventListener('click', () => {
                         const priceEl = document.getElementById(`price-${index}`);
                         const currentPrice = parsePriceCents(priceEl?.textContent);
                         showForecastChart(
@@ -514,7 +514,7 @@
                             cell.dataset.postcode,
                             currentPrice
                         );
-                    });
+                    // });
                 } else {
                     cell.className = "grid-node";
                     cell.style.cursor = "pointer";
