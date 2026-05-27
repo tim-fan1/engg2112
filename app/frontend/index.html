@@ -197,12 +197,12 @@
                 TXT_DATABASE = await response.text();
                 
                 searchBox.disabled = false;
-                searchBox.placeholder = "Search for a suburb (e.g. Sydney, Sydenham)";
+                searchBox.placeholder = "Search for a suburb (e.g. Randwick)";
                 
-                renderSuburbDashboard("SYDNEY");
+                renderSuburbDashboard("RANDWICK");
             } catch (err) {
                 searchBox.disabled = false;
-                searchBox.placeholder = "Search for a suburb (e.g. Sydney, Sydenham)";
+                searchBox.placeholder = "Search for a suburb (e.g. Randwick)";
                 console.warn("Local file reading restricted. Running search directly via public API.");
             }
         });
@@ -252,27 +252,32 @@
         }
     
         function renderSuburbDashboard(suburbName) {
-            focusTitle.textContent = `Suburb Matrix: ${suburbName}`;
+            // Standardize input string format to upper case (e.g., "THE ROCKS")
+            const cleanSearchName = suburbName.split('(')[0].trim().toUpperCase();
+            focusTitle.textContent = `Suburb Matrix: ${cleanSearchName}`;
             
             if (!TXT_DATABASE) {
-                generateFailsafeGrid(suburbName);
+                generateFailsafeGrid(cleanSearchName);
                 return;
             }
-    
-            const regex = new RegExp(`### SUBURB:\\s*${suburbName}[\\s\\S]*?([\\s\\S]*?)(?=={5,}|###|$)`, 'i');
+
+            // New Regex: Finds the line starting with "### SUBURB: THE ROCKS" matching everything up to the closing braces
+            const regex = new RegExp(`### SUBURB:\\s*${cleanSearchName}\\s*\\(?(\\d{4})?\\)?[\\s\\S]*?([\\s\\S]*?)(?=={5,}|###|$)`, 'i');
             const match = TXT_DATABASE.match(regex);
-    
+
             if (!match) {
-                generateFailsafeGrid(suburbName);
+                generateFailsafeGrid(cleanSearchName);
                 return;
             }
-    
-            const textLines = match[1].split('\n')
+
+            // Capture the postcode from the regex grouping if it exists
+            const detectedPostcode = match[1] || ""; 
+
+            const textLines = match[2].split('\n')
                 .map(line => line.trim())
                 .filter(line => line.includes('[') && !line.includes('---'));
-    
+
             let itemsArray = [];
-    
             textLines.forEach(line => {
                 const elements = line.split('|').map(el => {
                     let cleaned = el.replace('[', '').replace(']', '').trim();
@@ -281,10 +286,11 @@
                 });
                 itemsArray.push(...elements);
             });
-    
+
             while(itemsArray.length < 9) itemsArray.push("");
-    
-            buildUiCompassGrid(itemsArray);
+
+            // Pass both the grid strings and the core center postcode down to render
+            buildUiCompassGrid(itemsArray, detectedPostcode);
         }
     
         function generateFailsafeGrid(centerSuburb) {
@@ -296,33 +302,78 @@
             buildUiCompassGrid(fallbackMatrix);
         }
     
-        // UPDATED: Builds clickable navigation nodes for smooth cross-suburb panning
-        function buildUiCompassGrid(matrixArray) {
+        async function buildUiCompassGrid(matrixArray, centerPostcode) {
             uiGrid.innerHTML = "";
-            matrixArray.forEach((item, index) => {
+            
+            for (let index = 0; index < matrixArray.length; index++) {
+                const item = matrixArray[index];
                 const cell = document.createElement('div');
                 
                 if (!item) {
                     cell.className = "grid-node empty-slot";
-                } else if (index === 4) { 
-                    // Center Active Suburb Node
+                    uiGrid.appendChild(cell);
+                    continue;
+                }
+
+                // 1. Extract clean name and postcode from strings like "The Rocks (2000)"
+                let itemSuburbName = item.split('(')[0].trim();
+                let itemPostcode = "";
+
+                const pcMatch = item.match(/\((\d{4})\)/);
+                if (pcMatch) {
+                    itemPostcode = pcMatch[1];
+                } else if (index === 4) {
+                    itemPostcode = centerPostcode; // Fallback for center node
+                }
+
+                // 2. Render layout HTML using the original raw string item to keep display text crisp
+                const layoutHtml = `
+                    <span class="node-name" style="margin-bottom: 6px;">${item}</span>
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                        <span style="font-size: 13px; font-weight: 700; color: #16a34a;" id="price-${index}">...</span>
+                        <span style="font-size: 11px; font-weight: 500; opacity: 0.8; font-family: monospace;" id="pred-${index}">🔮 Predict: ...</span>
+                    </div>
+                `;
+
+                if (index === 4) {
                     cell.className = "grid-node center-active";
-                    cell.innerHTML = `<span class="node-name">${item}</span><span class="node-price">${generateMockFuelPrice()}</span>`;
+                    cell.innerHTML = layoutHtml;
                 } else {
-                    // Outer Clickable Suburb Panning Buttons
                     cell.className = "grid-node";
                     cell.style.cursor = "pointer";
-                    cell.title = `Pan map directionally to ${item}`;
-                    cell.innerHTML = `<span class="node-name">${item}</span><span class="node-price">${generateMockFuelPrice()}</span>`;
+                    cell.innerHTML = layoutHtml;
                     
-                    // Clicking shifts the entire dashboard layout state smoothly
                     cell.addEventListener('click', () => {
-                        searchBox.value = item; // Update text box target string
-                        renderSuburbDashboard(item.toUpperCase()); // Pan view focus
+                        // When panning, pass along the clean name
+                        searchBox.value = itemSuburbName;
+                        renderSuburbDashboard(itemSuburbName.toUpperCase());
                     });
                 }
+                
                 uiGrid.appendChild(cell);
-            });
+
+                // 3. Fire the payload with separate parameters down to Port 5000
+                fetch(`http://127.0.0.1:5000/api/fuel`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        suburb: itemSuburbName.toUpperCase(),
+                        postcode: itemPostcode 
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById(`price-${index}`).textContent = data.price;
+                    
+                    const predElement = document.getElementById(`pred-${index}`);
+                    predElement.textContent = `🔮 Forecast: ${data.prediction}`;
+                    if(index === 4) predElement.style.color = "#67e8f9"; 
+                })
+                .catch(() => {
+                    document.getElementById(`price-${index}`).textContent = "Error";
+                    document.getElementById(`pred-${index}`).textContent = "Offline";
+                });
+            }
         }
     
         document.addEventListener('click', (e) => {
