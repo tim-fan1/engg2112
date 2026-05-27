@@ -159,11 +159,112 @@
         .center-active .node-price {
             color: #67e8f9;
         }
+
+        .grid-node.center-active {
+            cursor: pointer;
+        }
+
+        .forecast-panel {
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            display: none;
+        }
+
+        .forecast-panel.visible {
+            display: block;
+        }
+
+        .forecast-panel h3 {
+            margin: 0 0 4px 0;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .forecast-panel .forecast-subtitle {
+            margin: 0 0 16px 0;
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+
+        .forecast-chart-wrap {
+            position: relative;
+            height: 280px;
+            width: 100%;
+        }
+
+        .forecast-loading {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 40px 0;
+            font-size: 14px;
+        }
+
+        .backtest-section {
+            margin-top: 28px;
+            padding-top: 22px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .backtest-section h3 {
+            margin: 0 0 4px 0;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .backtest-mae {
+            display: inline-block;
+            margin: 8px 0 14px 0;
+            padding: 6px 12px;
+            background: #f1f5f9;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .backtest-chart-wrap {
+            position: relative;
+            height: 220px;
+            width: 100%;
+            margin-bottom: 16px;
+        }
+
+        .backtest-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .backtest-table th,
+        .backtest-table td {
+            padding: 8px 10px;
+            text-align: right;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .backtest-table th {
+            text-align: right;
+            font-weight: 600;
+            color: var(--text-muted);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .backtest-table th:first-child,
+        .backtest-table td:first-child {
+            text-align: left;
+        }
+
+        .backtest-table .err-pos { color: #dc2626; }
+        .backtest-table .err-neg { color: #16a34a; }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
-    <div class="header-date" id="live-date">26/05/2026</div>
+    <div class="header-date" id="live-date"></div>
 
     <div class="search-wrapper">
         <span class="search-icon">🔍</span>
@@ -175,6 +276,39 @@
     <div class="dashboard-container">
         <div class="suburb-title" id="current-focus-title">Select A Location</div>
         <div class="compass-grid" id="ui-compass-grid"></div>
+
+        <div id="forecast-panel" class="forecast-panel">
+            <h3 id="forecast-title">14-day price forecast</h3>
+            <p class="forecast-subtitle" id="forecast-subtitle">
+                Recursive ML forecast — each day predicted from the previous day's price.
+            </p>
+            <div class="forecast-chart-wrap">
+                <canvas id="forecast-chart"></canvas>
+            </div>
+            <div id="forecast-loading" class="forecast-loading" style="display: none;">Loading forecast…</div>
+
+            <div class="backtest-section" id="backtest-section">
+                <h3>Model accuracy — last 7 days</h3>
+                <p class="forecast-subtitle">
+                    What we predicted the day before vs the price that actually arrived (mock data).
+                </p>
+                <div class="backtest-mae" id="backtest-mae"></div>
+                <div class="backtest-chart-wrap">
+                    <canvas id="backtest-chart"></canvas>
+                </div>
+                <table class="backtest-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Predicted</th>
+                            <th>Actual</th>
+                            <th>Error</th>
+                        </tr>
+                    </thead>
+                    <tbody id="backtest-table-body"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -183,14 +317,35 @@
         const dropdownMenu = document.getElementById('dropdown-menu');
         const focusTitle = document.getElementById('current-focus-title');
         const uiGrid = document.getElementById('ui-compass-grid');
-    
+        const forecastPanel = document.getElementById('forecast-panel');
+        const forecastTitle = document.getElementById('forecast-title');
+        const forecastSubtitle = document.getElementById('forecast-subtitle');
+        const forecastLoading = document.getElementById('forecast-loading');
+        const forecastChartCanvas = document.getElementById('forecast-chart');
+        const backtestChartCanvas = document.getElementById('backtest-chart');
+        const backtestMae = document.getElementById('backtest-mae');
+        const backtestTableBody = document.getElementById('backtest-table-body');
+
         let debounceTimer;
+        let forecastChart = null;
+        let backtestChart = null;
+        const FORECAST_DAYS = 14;
     
         function generateMockFuelPrice() {
             return (Math.random() * (2.15 - 1.74) + 1.74).toFixed(2) + "¢";
         }
     
+        function updateLiveDate() {
+            const el = document.getElementById('live-date');
+            el.textContent = new Date().toLocaleDateString('en-AU', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+            });
+        }
+
         window.addEventListener('DOMContentLoaded', async () => {
+            updateLiveDate();
             try {
                 const response = await fetch('all_nsw_suburbs_grids.txt');
                 if (!response.ok) throw new Error("File grid targets unreached");
@@ -252,6 +407,16 @@
         }
     
         function renderSuburbDashboard(suburbName) {
+            forecastPanel.classList.remove('visible');
+            if (forecastChart) {
+                forecastChart.destroy();
+                forecastChart = null;
+            }
+            if (backtestChart) {
+                backtestChart.destroy();
+                backtestChart = null;
+            }
+
             // Standardize input string format to upper case (e.g., "THE ROCKS")
             const cleanSearchName = suburbName.split('(')[0].trim().toUpperCase();
             focusTitle.textContent = `Suburb Matrix: ${cleanSearchName}`;
@@ -338,6 +503,18 @@
                 if (index === 4) {
                     cell.className = "grid-node center-active";
                     cell.innerHTML = layoutHtml;
+                    cell.title = "Click for 14-day forecast chart";
+                    cell.dataset.suburb = itemSuburbName.toUpperCase();
+                    cell.dataset.postcode = itemPostcode;
+                    cell.addEventListener('click', () => {
+                        const priceEl = document.getElementById(`price-${index}`);
+                        const currentPrice = parsePriceCents(priceEl?.textContent);
+                        showForecastChart(
+                            cell.dataset.suburb,
+                            cell.dataset.postcode,
+                            currentPrice
+                        );
+                    });
                 } else {
                     cell.className = "grid-node";
                     cell.style.cursor = "pointer";
@@ -374,6 +551,163 @@
                     document.getElementById(`pred-${index}`).textContent = "Offline";
                 });
             }
+        }
+
+        function parsePriceCents(text) {
+            if (!text || text === '...' || text === 'N/A' || text.startsWith('Err')) return null;
+            const n = parseFloat(String(text).replace('¢', '').trim());
+            return Number.isFinite(n) ? n : null;
+        }
+
+        async function showForecastChart(suburb, postcode, currentPrice) {
+            forecastPanel.classList.add('visible');
+            forecastTitle.textContent = `14-day forecast: ${suburb}${postcode ? ` (${postcode})` : ''}`;
+            forecastSubtitle.textContent =
+                'Recursive ML forecast — each day uses the previous day\'s predicted price as input.';
+            forecastLoading.style.display = 'block';
+            forecastChartCanvas.style.display = 'none';
+
+            const body = { suburb, postcode, days: FORECAST_DAYS };
+            if (currentPrice != null) body.current_price = currentPrice;
+
+            try {
+                const res = await fetch('http://127.0.0.1:5000/api/fuel/forecast', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Forecast failed');
+
+                renderForecastChart(data.series);
+                if (data.backtest) renderBacktest(data.backtest);
+            } catch (err) {
+                console.error(err);
+                forecastSubtitle.textContent = 'Could not load forecast. Is the backend running?';
+            } finally {
+                forecastLoading.style.display = 'none';
+                forecastChartCanvas.style.display = 'block';
+            }
+        }
+
+        function renderForecastChart(series) {
+            const labels = series.map((p) => {
+                const d = new Date(p.date + 'T12:00:00');
+                return p.day_offset === 0 ? 'Today' : d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+            });
+            const prices = series.map((p) => p.price);
+            const pointColors = series.map((p) => (p.kind === 'actual' ? '#2563eb' : '#16a34a'));
+            const pointRadii = series.map((p) => (p.kind === 'actual' ? 6 : 4));
+
+            if (forecastChart) forecastChart.destroy();
+
+            forecastChart = new Chart(forecastChartCanvas, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: 'Price (¢/L)',
+                        data: prices,
+                        borderColor: '#2563eb',
+                        backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                        fill: true,
+                        tension: 0.25,
+                        pointBackgroundColor: pointColors,
+                        pointBorderColor: pointColors,
+                        pointRadius: pointRadii,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.parsed.y.toFixed(1)}¢`,
+                            },
+                        },
+                    },
+                    scales: {
+                        y: {
+                            title: { display: true, text: '¢ / L' },
+                            ticks: {
+                                callback: (v) => `${v}¢`,
+                            },
+                        },
+                    },
+                },
+            });
+        }
+
+        function renderBacktest(backtest) {
+            const rows = backtest.series || [];
+            backtestMae.textContent =
+                `Mean absolute error: ${backtest.mae}¢/L over ${backtest.days} days`;
+
+            backtestTableBody.innerHTML = rows.map((row) => {
+                const d = new Date(row.date + 'T12:00:00');
+                const dateLabel = d.toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short' });
+                const errClass = row.error > 0 ? 'err-pos' : row.error < 0 ? 'err-neg' : '';
+                const errSign = row.error > 0 ? '+' : '';
+                return `<tr>
+                    <td>${dateLabel}</td>
+                    <td>${row.predicted.toFixed(1)}¢</td>
+                    <td>${row.actual.toFixed(1)}¢</td>
+                    <td class="${errClass}">${errSign}${row.error.toFixed(1)}¢</td>
+                </tr>`;
+            }).join('');
+
+            const labels = rows.map((row) => {
+                const d = new Date(row.date + 'T12:00:00');
+                return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' });
+            });
+
+            if (backtestChart) backtestChart.destroy();
+
+            backtestChart = new Chart(backtestChartCanvas, {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [
+                        {
+                            label: 'Actual',
+                            data: rows.map((r) => r.actual),
+                            borderColor: '#1e293b',
+                            backgroundColor: 'transparent',
+                            tension: 0.2,
+                            pointRadius: 4,
+                        },
+                        {
+                            label: 'Predicted (day before)',
+                            data: rows.map((r) => r.predicted),
+                            borderColor: '#f59e0b',
+                            borderDash: [6, 4],
+                            backgroundColor: 'transparent',
+                            tension: 0.2,
+                            pointRadius: 4,
+                        },
+                    ],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y.toFixed(1)}¢`,
+                            },
+                        },
+                    },
+                    scales: {
+                        y: {
+                            title: { display: true, text: '¢ / L' },
+                            ticks: { callback: (v) => `${v}¢` },
+                        },
+                    },
+                },
+            });
         }
     
         document.addEventListener('click', (e) => {

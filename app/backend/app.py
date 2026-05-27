@@ -8,11 +8,12 @@ import requests
 from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS, cross_origin
 
+from ml_predict import generate_mock_backtest, predict_recursive_forecast, predict_tomorrow_price
+
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}}, supports_credentials=True)
 
 # Set USE_FUELCHECK_API=1 to call the live NSW FuelCheck API (default: mock prices).
-# Remember to export USE_FUELCHECK_API=1 in the terminal to use the live API.
 USE_FUELCHECK_API = os.environ.get("USE_FUELCHECK_API", "").strip().lower() in ("1", "true", "yes")
 
 AUTH_HEADER = os.environ.get(
@@ -26,21 +27,69 @@ FUEL_LOCATION_URL = "https://api.onegov.nsw.gov.au/FuelPriceCheck/v1/fuel/prices
 
 MOCK_PRICE_MIN = 174.0
 MOCK_PRICE_MAX = 215.0
-MOCK_PREDICTION_OFFSET = 1.5
+FALLBACK_PREDICTION_OFFSET = 1.5
+DEFAULT_FORECAST_DAYS = 14
+DEFAULT_BACKTEST_DAYS = 7
 
 _token_cache = {"access_token": None, "expires_at": 0.0}
 
 
-def _mock_prices(location: str):
-    """Deterministic mock cents/L from location (stable per suburb/postcode)."""
-    seed = int(hashlib.md5(location.upper().encode()).hexdigest()[:8], 16)
-    span = MOCK_PRICE_MAX - MOCK_PRICE_MIN
-    current = MOCK_PRICE_MIN + (seed % int(span * 10 + 1)) / 10.0
-    predicted = current + MOCK_PREDICTION_OFFSET
+def _ml_forecast(current_price: float, postcode: str, location: str) -> float:
+    try:
+        return predict_tomorrow_price(
+            postcode=postcode or None,
+            current_price=current_price,
+            location_key=location,
+        )
+    except Exception as exc:
+        print(f"ML forecast fallback ({exc})")
+        return current_price + FALLBACK_PREDICTION_OFFSET
+
+
+def _price_response(current_price: float, postcode: str, location: str):
+    predicted = _ml_forecast(current_price, postcode, location)
     return {
-        "price": f"{current:.1f}¢",
+        "price": f"{current_price:.1f}¢",
         "prediction": f"{predicted:.1f}¢",
     }
+
+
+def _mock_current_price(location: str) -> float:
+    seed = int(hashlib.md5(location.upper().encode()).hexdigest()[:8], 16)
+    span = MOCK_PRICE_MAX - MOCK_PRICE_MIN
+    return MOCK_PRICE_MIN + (seed % int(span * 10 + 1)) / 10.0
+
+
+def _mock_prices(location: str, postcode: str):
+    return _price_response(_mock_current_price(location), postcode, location)
+
+
+def _resolve_current_price(location: str, suburb: str, postcode: str) -> float | None:
+    if USE_FUELCHECK_API:
+        response = requests.post(
+            FUEL_LOCATION_URL,
+            json={"fueltype": "E10", "namedlocation": location},
+            headers=_fuel_api_headers(),
+            timeout=15,
+        )
+        if response.status_code == 401:
+            _token_cache["access_token"] = None
+            _token_cache["expires_at"] = 0.0
+            response = requests.post(
+                FUEL_LOCATION_URL,
+                json={"fueltype": "E10", "namedlocation": location},
+                headers=_fuel_api_headers(),
+                timeout=15,
+            )
+        if response.status_code != 200:
+            return None
+        raw_prices = [
+            float(s["price"])
+            for s in response.json().get("prices", [])
+            if "price" in s
+        ]
+        return sum(raw_prices) / len(raw_prices) if raw_prices else None
+    return _mock_current_price(location)
 
 
 def _get_access_token():
@@ -74,45 +123,12 @@ def _fuel_api_headers():
     }
 
 
-def _live_prices(location: str, suburb: str):
-    response = requests.post(
-        FUEL_LOCATION_URL,
-        json={"fueltype": "E10", "namedlocation": location},
-        headers=_fuel_api_headers(),
-        timeout=15,
-    )
-
-    if response.status_code == 401:
-        _token_cache["access_token"] = None
-        _token_cache["expires_at"] = 0.0
-        response = requests.post(
-            FUEL_LOCATION_URL,
-            json={"fueltype": "E10", "namedlocation": location},
-            headers=_fuel_api_headers(),
-            timeout=15,
-        )
-
+def _live_prices(location: str, suburb: str, postcode: str):
     print(f"--- FuelCheck API: {suburb} (location: {location}) ---")
-    print(f"Status Received: {response.status_code}")
-
-    if response.status_code != 200:
-        print(f"Error Body: {response.text}")
-        return {"price": f"Err {response.status_code}", "prediction": "Err"}
-
-    prices_list = response.json().get("prices", [])
-    if not prices_list:
+    current = _resolve_current_price(location, suburb, postcode)
+    if current is None:
         return {"price": "N/A", "prediction": "N/A"}
-
-    raw_prices = [float(station["price"]) for station in prices_list if "price" in station]
-    if not raw_prices:
-        return {"price": "N/A", "prediction": "N/A"}
-
-    avg_current_price = sum(raw_prices) / len(raw_prices)
-    predicted_price = avg_current_price + MOCK_PREDICTION_OFFSET
-    return {
-        "price": f"{avg_current_price:.1f}¢",
-        "prediction": f"{predicted_price:.1f}¢",
-    }
+    return _price_response(current, postcode, location)
 
 
 @app.route('/api/fuel', methods=['POST', 'OPTIONS'])
@@ -136,14 +152,80 @@ def get_fuel_data():
 
     try:
         if USE_FUELCHECK_API:
-            return jsonify(_live_prices(location, suburb))
-        return jsonify(_mock_prices(location))
+            return jsonify(_live_prices(location, suburb, postcode))
+        return jsonify(_mock_prices(location, postcode))
     except Exception as e:
         print(f"Exception triggered: {str(e)}")
         return jsonify({"price": "Offline", "prediction": "Offline"}), 500
 
 
+@app.route('/api/fuel/forecast', methods=['POST', 'OPTIONS'])
+@cross_origin()
+def get_fuel_forecast():
+    if request.method == 'OPTIONS':
+        response = make_response()
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
+        return response
+
+    data = request.json or {}
+    suburb = data.get('suburb', '').upper().strip()
+    postcode = data.get('postcode', '').strip()
+    location = postcode or suburb
+    horizon_days = int(data.get('days', DEFAULT_FORECAST_DAYS))
+
+    if not suburb and not postcode:
+        return jsonify({"error": "suburb or postcode required"}), 400
+
+    if horizon_days < 1 or horizon_days > 30:
+        return jsonify({"error": "days must be between 1 and 30"}), 400
+
+    try:
+        current_price = data.get('current_price')
+        if current_price is not None:
+            current_price = float(current_price)
+        else:
+            current_price = _resolve_current_price(location, suburb, postcode)
+
+        if current_price is None:
+            return jsonify({"error": "Could not resolve current price"}), 404
+
+        series = predict_recursive_forecast(
+            postcode=postcode or None,
+            current_price=current_price,
+            location_key=location,
+            horizon_days=horizon_days,
+        )
+        backtest_days = int(data.get("backtest_days", DEFAULT_BACKTEST_DAYS))
+        backtest = generate_mock_backtest(
+            location_key=location,
+            anchor_price=current_price,
+            days=max(1, min(backtest_days, 30)),
+        )
+
+        return jsonify({
+            "suburb": suburb,
+            "postcode": postcode,
+            "current_price": round(current_price, 2),
+            "horizon_days": horizon_days,
+            "series": series,
+            "backtest": backtest,
+        })
+    except Exception as e:
+        print(f"Forecast exception: {e}")
+        return jsonify({"error": "Forecast unavailable"}), 500
+
+
 if __name__ == '__main__':
     mode = "FuelCheck API" if USE_FUELCHECK_API else "mock prices"
-    print(f"Fuel backend: {mode} (set USE_FUELCHECK_API=1 for live API)")
+    try:
+        from ml_predict import feature_column_names
+
+        feature_column_names()
+        print(f"Fuel backend: {mode} | ML model loaded ({len(feature_column_names())} features)")
+    except Exception as exc:
+        print(f"Fuel backend: {mode} | ML model NOT loaded: {exc}")
+        print("  Run: python app/backend/export_rf_model.py")
+    print("  Set USE_FUELCHECK_API=1 for live FuelCheck prices")
     app.run(port=5000, debug=True)
