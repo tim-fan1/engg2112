@@ -16,9 +16,11 @@ The scikit-learn model can be exported for Python usage elsewhere by using jobli
 
 # App
 
-The frontend is just a single ``index.html`` file with a plaintext file listing all NSW suburbs in a grid topology. So a frontend server will be required to serve a user this plaintext file. For development, an extension like the Live Server for Visual Studio Code can be used. For deployment, the application can be hosted as a static site using services such as GitHub Pages, Netlify, Vercel, or any standard web server such as an Nginx or Apache HTTP Server.
+The frontend is just a single ``index.html`` file with a plaintext file listing all NSW suburbs in a grid topology. So a frontend server will be required to serve a user this plaintext file. 
 
-The frontend server should serve the files in ``app/frontend/``.
+For development, an extension like the Live Server for Visual Studio Code can be used. For deployment, the application can be hosted as a static site using services such as GitHub Pages, or any standard web server such as an Nginx HTTP Server.
+
+The frontend server should serve the files in ``app/frontend/``. For development and testing, an extension like the ***Live Server for Visual Studio Code*** extension should be used.
 
 The backend is a simple Python Flask server at ``app.py`` that uses the previously exported scikit-learn ML model to serve price prediction requests from the frontend. For development and deployment a web server with Python installed should be sufficient, with other necessary requirements installable through ``pip install -r requirements.txt``. 
 
