@@ -3,6 +3,7 @@ tutorial/
 .meigo/
 .DS_Store
 .ipynb_checkpoints
+__pycache__
 .venv/
 COMPLETE_DATASET.csv
 MODEL_READY_DATASET.csv
