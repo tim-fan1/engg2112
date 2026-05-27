@@ -16,9 +16,7 @@ The scikit-learn model can be exported for Python usage elsewhere by using jobli
 
 # App
 
-The frontend is just a single ``index.html`` file with a plaintext file listing all NSW suburbs in a grid topology. So a frontend server will be required to serve a user this plaintext file. 
-
-For development, an extension like the Live Server for Visual Studio Code can be used. For deployment, the application can be hosted as a static site using services such as GitHub Pages, or any standard web server such as an Nginx HTTP Server.
+The frontend is just a single ``index.html`` file with a plaintext file listing all NSW suburbs in a grid topology. So a frontend server will be required to serve a user this plaintext file. For development, an extension like the Live Server for Visual Studio Code can be used. For deployment, the application can be hosted as a static site using services such as GitHub Pages, or any standard web server such as an Nginx HTTP Server.
 
 The frontend server should serve the files in ``app/frontend/``. For development and testing, an extension like the ***Live Server for Visual Studio Code*** extension should be used.
 
